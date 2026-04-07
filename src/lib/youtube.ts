@@ -127,6 +127,10 @@ export async function getTranscript(videoId: string, language: string = 'en'): P
         lang: language,
       });
       
+      if (!rawTranscript || rawTranscript.length === 0) {
+        throw new Error(`[YoutubeTranscript] 🚨 No transcript content returned for language: ${language}`);
+      }
+
       // The library returns an array of objects, each with a 'text' field.
       // We need to concatenate these into a single string.
       const fullText = rawTranscript.map(item => item.text).join(' ');

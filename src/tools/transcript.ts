@@ -70,7 +70,8 @@ export async function getTranscript(url: string, language: string = 'auto'): Pro
  * Tries common languages in order: en, original video language (if detectable), others
  */
 async function getTranscriptWithAutoDetection(videoId: string): Promise<string> {
-  const languagesToTry = ['en', 'es', 'fr', 'de', 'tr', 'pt', 'ja', 'ko', 'zh', 'it', 'ru', 'ar'];
+  // Priority languages to try for auto-detection
+  const languagesToTry = ['zh-Hant', 'zh-Hans', 'en', 'zh', 'ja', 'ko', 'es', 'fr', 'de', 'tr', 'pt', 'it', 'ru', 'ar'];
 
   let lastError: any;
   let availableLanguages: string[] = [];
@@ -135,6 +136,10 @@ async function getTranscriptWithFallback(videoId: string, requestedLanguage: str
 
     // Try fetching in requested language
     const transcript = await fetchTranscriptFromYouTube(videoId, requestedLanguage);
+
+    if (!transcript || transcript.trim().length === 0) {
+      throw new Error(`Transcript fetch returned empty content for language: ${requestedLanguage}`);
+    }
 
     // Cache and return successful result
     await setCachedTranscript(videoId, requestedLanguage, transcript, false);

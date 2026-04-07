@@ -1,8 +1,9 @@
 export const config = {
-  runtime: 'edge',
+  runtime: 'nodejs',
 };
 
 import { getTranscript } from '../src/tools/transcript';
+
 
 // Simple MCP server implementation for Vercel
 class SimpleMCPServer {
