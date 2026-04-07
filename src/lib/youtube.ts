@@ -1,4 +1,6 @@
-import { YoutubeTranscript } from 'youtube-transcript';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { YoutubeTranscript } = require('youtube-transcript');
 
 const MAX_RETRIES = 3;
 const INITIAL_BACKOFF_MS = 1000;
@@ -92,7 +94,7 @@ export async function getTranscript(videoId: string, language: string = 'en'): P
         throw new Error(`[YoutubeTranscript] 🚨 No transcript content returned for language: ${language}`);
       }
 
-      const fullText = rawTranscript.map(item => item.text).join(' ');
+      const fullText = rawTranscript.map((item: any) => item.text).join(' ');
       return sanitizeTranscriptText(fullText);
 
     } catch (error: any) {
