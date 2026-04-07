@@ -1,0 +1,20 @@
+{
+  "name": "remote-mcp-github-oauth",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel deploy",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@vercel/kv": "^3.0.0",
+    "url-parse": "^1.5.10",
+    "youtube-transcript": "^1.2.1"
+  },
+  "devDependencies": {
+    "@types/url-parse": "^1.4.11",
+    "typescript": "^5.8.3"
+  }
+}
