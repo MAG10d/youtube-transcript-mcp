@@ -72,14 +72,15 @@ class SimpleMCPServer {
                 }
               };
             } catch (error) {
-              const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+              const errorMessage = error instanceof Error ? `${error.message} | stack: ${error.stack}` : String(error);
+              console.error('get_transcript error:', errorMessage);
 
               return {
                 jsonrpc: '2.0',
                 id,
                 error: {
                   code: -1,
-                  message: errorMessage
+                  message: error instanceof Error ? error.message : 'Unknown error occurred'
                 }
               };
             }

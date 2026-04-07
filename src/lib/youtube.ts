@@ -169,9 +169,8 @@ export async function getTranscript(videoId: string, language: string = 'en'): P
 
       // If it's an unknown error or the last attempt, rethrow it to be handled by the caller.
       if (attempts >= MAX_RETRIES) {
-        console.error(`Final attempt failed for ${videoId}. Error: ${error.message}`);
-        // Rethrow a generic error or a more specific one if identifiable
-        throw new Error(`Failed to fetch transcript for ${videoId} after ${MAX_RETRIES} attempts: ${error.message}`);
+        console.error(`Final attempt failed for ${videoId}. Raw error:`, JSON.stringify(error, Object.getOwnPropertyNames(error)));
+        throw new Error(`Failed to fetch transcript for ${videoId}: ${error?.message || String(error)}`);
       }
       
       // Default retry for other errors
