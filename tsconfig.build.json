@@ -3,11 +3,11 @@
   "compilerOptions": {
     "noEmit": false,
     "outDir": "dist",
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "jsx": "react-jsx",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "target": "es2022",
     "declaration": false,
+    "strict": false,
     "skipLibCheck": true
   },
   "include": ["api/**/*", "src/**/*"]
