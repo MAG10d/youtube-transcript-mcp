@@ -1,8 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "fluid": true,
-  "outputDirectory": "dist",
   "rewrites": [
     { "source": "/(.*)", "destination": "/api/index" }
-  ]
+  ],
+  "functions": {
+    "api/index.ts": {
+      "runtime": "nodejs22.x"
+    }
+  }
 }
