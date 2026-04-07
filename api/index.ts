@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'http';
-import { getTranscript } from '../src/tools/transcript';
+import { getTranscript } from '../src/lib/youtube';
+import { extractVideoId } from '../src/utils/url-normalize';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -39,7 +40,7 @@ class SimpleMCPServer {
                   type: 'object',
                   properties: {
                     url: { type: 'string', description: 'YouTube video URL (any format)' },
-                    language: { type: 'string', description: "Optional language code (e.g. 'en'). Defaults to auto." }
+                    language: { type: 'string', description: "Optional language code (e.g. 'en'). Defaults to 'en'." }
                   },
                   required: ['url']
                 }
@@ -51,8 +52,12 @@ class SimpleMCPServer {
           const { name, arguments: args } = params;
           if (name === 'get_transcript') {
             try {
-              const { url, language = 'auto' } = args;
-              const transcript = await getTranscript(url, language);
+              const { url, language = 'en' } = args;
+              const videoId = extractVideoId(url);
+              if (!videoId) {
+                return { jsonrpc: '2.0', id, error: { code: -1, message: 'Invalid YouTube URL: could not extract video ID' } };
+              }
+              const transcript = await getTranscript(videoId, language);
               return { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: transcript }] } };
             } catch (error) {
               return { jsonrpc: '2.0', id, error: { code: -1, message: error instanceof Error ? error.message : 'Unknown error' } };
