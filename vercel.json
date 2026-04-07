@@ -3,10 +3,5 @@
   "fluid": true,
   "rewrites": [
     { "source": "/(.*)", "destination": "/api/index" }
-  ],
-  "functions": {
-    "api/index.ts": {
-      "runtime": "nodejs22.x"
-    }
-  }
+  ]
 }
