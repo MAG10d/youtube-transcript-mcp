@@ -1,37 +1,36 @@
-export const config = {
-  runtime: 'nodejs',
-};
-
+import type { IncomingMessage, ServerResponse } from 'http';
 import { getTranscript } from '../src/tools/transcript';
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Cache-Control, Accept',
+};
 
-// Simple MCP server implementation for Vercel
+function sendJson(res: ServerResponse, status: number, data: object) {
+  const body = JSON.stringify(data);
+  res.writeHead(status, { 'Content-Type': 'application/json', ...CORS_HEADERS });
+  res.end(body);
+}
+
 class SimpleMCPServer {
   async handleRequest(request: any) {
     const { method, params, id } = request;
-
     try {
       switch (method) {
         case 'initialize':
           return {
-            jsonrpc: '2.0',
-            id,
+            jsonrpc: '2.0', id,
             result: {
               protocolVersion: '2024-11-05',
-              capabilities: {
-                tools: {}
-              },
-              serverInfo: {
-                name: 'youtube-transcript-remote',
-                version: '1.0.0'
-              }
+              capabilities: { tools: {} },
+              serverInfo: { name: 'youtube-transcript-remote', version: '1.0.0' }
             }
           };
 
         case 'tools/list':
           return {
-            jsonrpc: '2.0',
-            id,
+            jsonrpc: '2.0', id,
             result: {
               tools: [{
                 name: 'get_transcript',
@@ -39,14 +38,8 @@ class SimpleMCPServer {
                 inputSchema: {
                   type: 'object',
                   properties: {
-                    url: {
-                      type: 'string',
-                      description: 'YouTube video URL (any format)'
-                    },
-                    language: {
-                      type: 'string',
-                      description: "Optional language code for the transcript (e.g., 'en', 'es'). Defaults to 'en'."
-                    }
+                    url: { type: 'string', description: 'YouTube video URL (any format)' },
+                    language: { type: 'string', description: "Optional language code (e.g. 'en'). Defaults to auto." }
                   },
                   required: ['url']
                 }
@@ -54,224 +47,113 @@ class SimpleMCPServer {
             }
           };
 
-        case 'tools/call':
+        case 'tools/call': {
           const { name, arguments: args } = params;
-
           if (name === 'get_transcript') {
             try {
-              const { url, language = 'en' } = args;
+              const { url, language = 'auto' } = args;
               const transcript = await getTranscript(url, language);
-
-              return {
-                jsonrpc: '2.0',
-                id,
-                result: {
-                  content: [{
-                    type: 'text',
-                    text: transcript
-                  }]
-                }
-              };
+              return { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: transcript }] } };
             } catch (error) {
-              const errorMessage = error instanceof Error ? `${error.message} | stack: ${error.stack}` : String(error);
-              console.error('get_transcript error:', errorMessage);
-
-              return {
-                jsonrpc: '2.0',
-                id,
-                error: {
-                  code: -1,
-                  message: error instanceof Error ? error.message : 'Unknown error occurred'
-                }
-              };
+              return { jsonrpc: '2.0', id, error: { code: -1, message: error instanceof Error ? error.message : 'Unknown error' } };
             }
-          } else {
-            return {
-              jsonrpc: '2.0',
-              id,
-              error: {
-                code: -32601,
-                message: `Unknown tool: ${name}`
-              }
-            };
           }
+          return { jsonrpc: '2.0', id, error: { code: -32601, message: `Unknown tool: ${name}` } };
+        }
 
         default:
-          return {
-            jsonrpc: '2.0',
-            id,
-            error: {
-              code: -32601,
-              message: `Method not found: ${method}`
-            }
-          };
+          return { jsonrpc: '2.0', id, error: { code: -32601, message: `Method not found: ${method}` } };
       }
     } catch (error) {
       console.error('Error handling request:', error);
-      return {
-        jsonrpc: '2.0',
-        id,
-        error: {
-          code: -32603,
-          message: 'Internal error'
-        }
-      };
+      return { jsonrpc: '2.0', id, error: { code: -32603, message: 'Internal error' } };
     }
   }
 }
 
-export default async function target(request: Request) {
-  const url = new URL(request.url);
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', chunk => { data += chunk; });
+    req.on('end', () => resolve(data));
+    req.on('error', reject);
+  });
+}
 
-  // Handle CORS preflight requests
-  if (request.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Cache-Control, Accept",
-        "Access-Control-Max-Age": "86400"
-      }
+export default async function handler(req: IncomingMessage, res: ServerResponse) {
+  const url = new URL(req.url || '/', `http://${req.headers.host}`);
+
+  // CORS preflight
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, CORS_HEADERS);
+    res.end();
+    return;
+  }
+
+  // Root info
+  if (url.pathname === '/') {
+    sendJson(res, 200, {
+      name: 'YouTube Transcript Remote MCP Server',
+      version: '1.0.0',
+      endpoints: { sse: '/sse', mcp: '/mcp' },
+      tools: ['get_transcript'],
+      status: 'ready'
     });
+    return;
   }
 
   const mcpServer = new SimpleMCPServer();
 
-  // Handle SSE endpoint for MCP
-  if (url.pathname === "/sse") {
-    // Check if this is a POST request with JSON-RPC data
-    if (request.method === "POST") {
+  // SSE endpoint
+  if (url.pathname === '/sse') {
+    if (req.method === 'POST') {
       try {
-        const requestData = await request.json();
+        const body = await readBody(req);
+        const requestData = JSON.parse(body);
         const response = await mcpServer.handleRequest(requestData);
-
-        // Return as SSE format
         const sseData = `data: ${JSON.stringify(response)}\n\n`;
-
-        return new Response(sseData, {
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Cache-Control, Accept",
-          }
-        });
+        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', ...CORS_HEADERS });
+        res.end(sseData);
       } catch (error) {
         console.error('SSE POST error:', error);
-        const errorResponse = `data: ${JSON.stringify({
-          jsonrpc: "2.0",
-          id: null,
-          error: {
-            code: -32603,
-            message: "Internal error"
-          }
-        })}\n\n`;
-
-        return new Response(errorResponse, {
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            "Access-Control-Allow-Origin": "*"
-          }
-        });
+        const errData = `data: ${JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32603, message: 'Internal error' } })}\n\n`;
+        res.writeHead(500, { 'Content-Type': 'text/event-stream', ...CORS_HEADERS });
+        res.end(errData);
       }
+      return;
     }
 
-    // Handle GET request for SSE connection
-    const { readable, writable } = new TransformStream();
-    const writer = writable.getWriter();
-    const encoder = new TextEncoder();
+    // GET — SSE stream
+    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', ...CORS_HEADERS });
+    const initMsg = `data: ${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized', params: {} })}\n\n`;
+    res.write(initMsg);
 
-    // In Vercel Node runtime, we can just start an async execution without `waitUntil`
-    // because returning the readable stream keeps the response open.
-    (async () => {
-      try {
-        // Send server ready message
-        await writer.write(encoder.encode(`data: ${JSON.stringify({
-          jsonrpc: "2.0",
-          method: "notifications/initialized",
-          params: {}
-        })}\n\n`));
-
-        // Keep connection alive
-        const keepAlive = setInterval(() => {
-          writer.write(encoder.encode(`: keepalive\n\n`)).catch(() => {
-            clearInterval(keepAlive);
-          });
-        }, 30000);
-
-        // Optional: clear interval on client close if Vercel supports ABORT signal
-        // request.signal.addEventListener('abort', () => clearInterval(keepAlive));
-      } catch (error) {
-        console.error('SSE stream error:', error);
+    const keepAlive = setInterval(() => {
+      if (!res.writableEnded) {
+        res.write(': keepalive\n\n');
+      } else {
+        clearInterval(keepAlive);
       }
-    })();
+    }, 30000);
 
-    return new Response(readable, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Cache-Control, Accept",
-      }
-    });
+    req.on('close', () => clearInterval(keepAlive));
+    return;
   }
 
-  // Handle JSON-RPC over HTTP POST
-  if (url.pathname === "/mcp" && request.method === "POST") {
+  // /mcp endpoint — Streamable HTTP (POST)
+  if (url.pathname === '/mcp' && req.method === 'POST') {
     try {
-      const requestData = await request.json();
+      const body = await readBody(req);
+      const requestData = JSON.parse(body);
       const response = await mcpServer.handleRequest(requestData);
-
-      return new Response(JSON.stringify(response), {
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*"
-        }
-      });
+      sendJson(res, 200, response);
     } catch (error) {
       console.error('MCP request error:', error);
-      return new Response(JSON.stringify({
-        jsonrpc: "2.0",
-        id: null,
-        error: {
-          code: -32603,
-          message: "Internal error"
-        }
-      }), {
-        status: 500,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*"
-        }
-      });
+      sendJson(res, 500, { jsonrpc: '2.0', id: null, error: { code: -32603, message: 'Internal error' } });
     }
+    return;
   }
 
-  // Handle root path with basic info
-  if (url.pathname === "/") {
-    return new Response(JSON.stringify({
-      name: "YouTube Transcript Remote MCP Server",
-      version: "1.0.0",
-      description: "Remote MCP server for extracting YouTube video transcripts",
-      endpoints: {
-        sse: "/sse",
-        mcp: "/mcp"
-      },
-      tools: ["get_transcript"],
-      status: "ready"
-    }), {
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*"
-      }
-    });
-  }
-
-  return new Response("Not Found", { status: 404 });
+  res.writeHead(404, CORS_HEADERS);
+  res.end('Not Found');
 }
