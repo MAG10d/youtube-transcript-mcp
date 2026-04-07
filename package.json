@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "dev": "vercel dev",
     "deploy": "vercel deploy",
     "type-check": "tsc --noEmit"

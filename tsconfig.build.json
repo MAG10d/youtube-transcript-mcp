@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "jsx": "react-jsx",
+    "target": "es2022",
+    "declaration": false,
+    "skipLibCheck": true
+  },
+  "include": ["api/**/*", "src/**/*"]
+}
