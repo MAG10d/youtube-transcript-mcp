@@ -2,6 +2,13 @@
 import * as readline from 'readline';
 import { getTranscript } from './tools/transcript';
 
+// IMPORTANT: MCP over stdio requires stdout to be strictly JSON-RPC only.
+// We redirect all logs to stderr so they don't break the protocol.
+const originalLog = console.log;
+const originalInfo = console.info;
+console.log = (...args) => console.error(...args);
+console.info = (...args) => console.error(...args);
+
 const rl = readline.createInterface({
   input: process.stdin,
   output: undefined,
