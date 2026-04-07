@@ -2,9 +2,7 @@
   "name": "remote-mcp-github-oauth",
   "version": "0.0.1",
   "private": true,
-  "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
     "dev": "vercel dev",
     "deploy": "vercel deploy",
     "type-check": "tsc --noEmit"
