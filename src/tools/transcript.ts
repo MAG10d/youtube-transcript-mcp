@@ -2,18 +2,18 @@ import {
   normalizeYouTubeUrl,
   extractVideoId,
   isValidYouTubeUrl,
-} from '../utils/url-normalize';
+} from '../utils/url-normalize.js';
 import {
   getCachedTranscript,
   setCachedTranscript,
   incrementVideoRequestCount,
   trackDailyRequests,
-} from '../utils/cache';
+} from '../utils/cache.js';
 import {
   getTranscript as fetchTranscriptFromYouTube,
   handleYouTubeErrors,
-} from '../lib/youtube';
-import { logRequest as logAnalyticsError } from '../utils/analytics';
+} from '../lib/youtube.js';
+import { logRequest as logAnalyticsError } from '../utils/analytics.js';
 
 // Define the MCP Tool Specification
 export const getTranscriptToolSpec = {
@@ -56,7 +56,6 @@ export async function getTranscript(url: string, language: string = 'auto'): Pro
   trackDailyRequests().catch(err => console.error("Failed to track daily requests:", err));
   incrementVideoRequestCount(videoId).catch(err => console.error("Failed to increment video request count:", err));
 
-
   // Handle auto detection or specific language request
   if (language === 'auto') {
     return await getTranscriptWithAutoDetection(videoId);
@@ -67,10 +66,8 @@ export async function getTranscript(url: string, language: string = 'auto'): Pro
 
 /**
  * Attempts to get transcript with automatic language detection
- * Tries common languages in order: en, original video language (if detectable), others
  */
 async function getTranscriptWithAutoDetection(videoId: string): Promise<string> {
-  // Priority languages to try for auto-detection
   const languagesToTry = ['zh-Hant', 'zh-Hans', 'en', 'zh', 'ja', 'ko', 'es', 'fr', 'de', 'tr', 'pt', 'it', 'ru', 'ar'];
 
   let lastError: any;
@@ -80,17 +77,13 @@ async function getTranscriptWithAutoDetection(videoId: string): Promise<string> 
     try {
       console.log(`Trying auto-detection for ${videoId} with language: ${lang}`);
 
-      // Check cache first
       const cachedData = await getCachedTranscript(videoId, lang);
       if (cachedData && !cachedData.startsWith('Error:')) {
         console.log(`Auto-detection: Found cached transcript in ${lang}`);
         return cachedData;
       }
 
-      // Try fetching
       const transcript = await fetchTranscriptFromYouTube(videoId, lang);
-
-      // Cache and return successful result
       await setCachedTranscript(videoId, lang, transcript, false);
 
       console.log(`Auto-detection: Successfully found transcript in ${lang}`);
@@ -100,7 +93,6 @@ async function getTranscriptWithAutoDetection(videoId: string): Promise<string> 
       lastError = error;
       console.log(`Auto-detection: ${lang} failed - ${error.message}`);
 
-      // If it's not a language availability issue, break early
       if (!isLanguageRelatedError(error)) {
         break;
       }
@@ -109,7 +101,6 @@ async function getTranscriptWithAutoDetection(videoId: string): Promise<string> 
     }
   }
 
-  // If we get here, none of the languages worked
   const errorMessage = availableLanguages.length > 0
     ? `No transcript available in any tested language. Tried: ${availableLanguages.join(', ')}`
     : handleYouTubeErrors(lastError);
@@ -122,10 +113,8 @@ async function getTranscriptWithAutoDetection(videoId: string): Promise<string> 
  */
 async function getTranscriptWithFallback(videoId: string, requestedLanguage: string): Promise<string> {
   try {
-    // First try the requested language
     console.log(`Attempting ${videoId} in requested language: ${requestedLanguage}`);
 
-    // Check cache first
     const cachedData = await getCachedTranscript(videoId, requestedLanguage);
     if (cachedData) {
       if (cachedData.startsWith('Error:')) {
@@ -134,66 +123,48 @@ async function getTranscriptWithFallback(videoId: string, requestedLanguage: str
       return cachedData;
     }
 
-    // Try fetching in requested language
     const transcript = await fetchTranscriptFromYouTube(videoId, requestedLanguage);
 
     if (!transcript || transcript.trim().length === 0) {
       throw new Error(`Transcript fetch returned empty content for language: ${requestedLanguage}`);
     }
 
-    // Cache and return successful result
     await setCachedTranscript(videoId, requestedLanguage, transcript, false);
-
     return transcript;
 
   } catch (error: any) {
     console.log(`Requested language ${requestedLanguage} failed: ${error.message}`);
 
-    // If it's a language-related error and not English, try English fallback
     if (isLanguageRelatedError(error) && requestedLanguage !== 'en') {
       console.log(`Attempting English fallback for ${videoId}`);
 
       try {
-        // Check English cache
         const cachedEnglish = await getCachedTranscript(videoId, 'en');
         if (cachedEnglish && !cachedEnglish.startsWith('Error:')) {
           return `[Requested language '${requestedLanguage}' not available, showing English instead]\n\n${cachedEnglish}`;
         }
 
-        // Try fetching English
         const englishTranscript = await fetchTranscriptFromYouTube(videoId, 'en');
-
-        // Cache English result
         await setCachedTranscript(videoId, 'en', englishTranscript, false);
-
         return `[Requested language '${requestedLanguage}' not available, showing English instead]\n\n${englishTranscript}`;
 
       } catch (englishError: any) {
         console.log(`English fallback also failed: ${englishError.message}`);
-
-        // Cache the original error for the requested language
         const errorMessage = handleYouTubeErrors(error);
         await setCachedTranscript(videoId, requestedLanguage, `Error: ${errorMessage}`, true);
-
         throw new Error(`Transcript not available in '${requestedLanguage}' and English fallback failed: ${handleYouTubeErrors(englishError)}`);
       }
     }
 
-    // For non-language errors or if English was requested, just throw the original error
     const errorMessage = handleYouTubeErrors(error);
     await setCachedTranscript(videoId, requestedLanguage, `Error: ${errorMessage}`, true);
     logAnalyticsError(videoId, false, error.name || 'FetchError').catch(err => console.error("Failed to log analytics error:", err));
-
     throw new Error(handleYouTubeErrors(error));
   }
 }
 
-/**
- * Checks if an error is related to language availability
- */
 function isLanguageRelatedError(error: any): boolean {
   if (!error || !error.message) return false;
-
   const message = error.message.toLowerCase();
   return message.includes('language') ||
     message.includes('subtitle') ||

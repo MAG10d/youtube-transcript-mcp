@@ -2,14 +2,12 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
-    "outDir": "dist",
+    "outDir": ".",
+    "rootDir": ".",
     "module": "es2022",
     "moduleResolution": "bundler",
-    "target": "es2022",
     "declaration": false,
-    "strict": false,
-    "skipLibCheck": true
+    "sourceMap": false
   },
-  "include": ["api/**/*", "src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["api/**/*.ts", "src/**/*.ts"]
 }

@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "fluid": true,
+  "buildCommand": "npx tsc --project tsconfig.build.json",
   "rewrites": [
     { "source": "/(.*)", "destination": "/api/index" }
   ]
