@@ -73,7 +73,7 @@ export function handleYouTubeErrors(error: any): string {
     }
   }
   console.error('Unhandled YouTube error:', error); // Log the original error for debugging
-  return 'An unexpected error occurred while fetching the transcript.';
+  return error?.message || 'An unexpected error occurred while fetching the transcript.';
 }
 
 /**
